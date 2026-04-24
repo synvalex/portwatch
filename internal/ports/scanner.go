@@ -1,59 +1,62 @@
 package ports
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 )
 
-// Listener represents an open port with its associated process info.
+// Listener represents a single open port on the host.
 type Listener struct {
-	Protocol string
-	Address  string
-	Port     int
-	PID      int
-	Process  string
+	Proto   string
+	Address net.IP
+	Port    uint16
+	PID     int
 }
 
 // String returns a human-readable representation of the listener.
 func (l Listener) String() string {
-	return fmt.Sprintf("%s %s:%d (pid=%d, process=%s)", l.Protocol, l.Address, l.Port, l.PID, l.Process)
+	return fmt.Sprintf("%s://%s:%d (pid %d)", l.Proto, l.Address, l.Port, l.PID)
 }
 
-// Scanner defines the interface for scanning open ports.
+// Scanner is the interface implemented by platform-specific scanners.
 type Scanner interface {
-	Scan() ([]Listener, error)
+	Scan(ctx context.Context) ([]Listener, error)
 }
 
-// ParseAddress splits a combined address:port string into its components.
-func ParseAddress(addr string) (string, int, error) {
+// ParseAddress parses a "host:port" or ":port" string into an IP and port.
+func ParseAddress(addr string) (net.IP, uint16, error) {
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		// Try treating the whole string as just a port
-		portStr = strings.TrimSpace(addr)
-		host = "0.0.0.0"
+		return nil, 0, fmt.Errorf("invalid address %q: %w", addr, err)
 	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return "", 0, fmt.Errorf("invalid port %q: %w", portStr, err)
+	var port uint16
+	if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+		return nil, 0, fmt.Errorf("invalid port %q: %w", portStr, err)
 	}
-	if port < 1 || port > 65535 {
-		return "", 0, fmt.Errorf("port %d out of valid range", port)
-	}
-	return host, port, nil
-}
-
-// DeduplicateListeners removes duplicate entries from a listener slice.
-func DeduplicateListeners(listeners []Listener) []Listener {
-	seen := make(map[string]struct{})
-	result := make([]Listener, 0, len(listeners))
-	for _, l := range listeners {
-		key := fmt.Sprintf("%s:%s:%d", l.Protocol, l.Address, l.Port)
-		if _, exists := seen[key]; !exists {
-			seen[key] = struct{}{}
-			result = append(result, l)
+	var ip net.IP
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		ip = net.IPv4zero
+	} else {
+		ip = net.ParseIP(strings.TrimSpace(host))
+		if ip == nil {
+			return nil, 0, fmt.Errorf("invalid IP address %q", host)
 		}
 	}
-	return result
+	return ip, port, nil
+}
+
+// DeduplicateListeners removes duplicate listeners from the slice.
+func DeduplicateListeners(listeners []Listener) []Listener {
+	seen := make(map[string]struct{}, len(listeners))
+	out := make([]Listener, 0, len(listeners))
+	for _, l := range listeners {
+		key := fmt.Sprintf("%s|%s|%d", l.Proto, l.Address.String(), l.Port)
+		if _, ok := seen[key]; !ok {
+			seen[key] = struct{}{}
+			out = append(out, l)
+		}
+	}
+	return out
 }
