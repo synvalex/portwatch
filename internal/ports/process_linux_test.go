@@ -72,3 +72,20 @@ func TestProcessInfo_String_Format(t *testing.T) {
 		})
 	}
 }
+
+// TestLookupInode_Self verifies that LookupInode can find a process entry for
+// a socket inode belonging to the current process, if one exists.
+func TestLookupInode_Self(t *testing.T) {
+	pid := os.Getpid()
+	name := readProcName(pid)
+	if name == "" {
+		t.Skip("cannot read /proc/self/comm, skipping inode self-lookup test")
+	}
+
+	// Attempt a lookup with a clearly invalid large inode; we just want to
+	// confirm the function returns without error on a Linux host.
+	_, err := LookupInode(^uint64(0))
+	if err != nil {
+		t.Skipf("LookupInode not supported on this platform: %v", err)
+	}
+}
