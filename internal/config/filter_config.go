@@ -1,5 +1,7 @@
 package config
 
+import "slices"
+
 // FilterConfig holds user-facing filter settings loaded from YAML.
 type FilterConfig struct {
 	// ExcludeLoopback controls whether loopback-bound listeners are hidden.
@@ -23,4 +25,9 @@ func (f FilterConfig) Merge(defaults FilterConfig) FilterConfig {
 		out.ExcludePorts = defaults.ExcludePorts
 	}
 	return out
+}
+
+// IsPortExcluded reports whether the given port number appears in ExcludePorts.
+func (f FilterConfig) IsPortExcluded(port uint16) bool {
+	return slices.Contains(f.ExcludePorts, port)
 }
