@@ -57,6 +57,16 @@ portwatch status
 | `--interval` | `30s` | Polling interval |
 | `--verbose` | `false` | Enable verbose logging |
 
+## Configuration Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `interval` | duration | How often to poll for open ports (e.g. `10s`, `1m`) |
+| `allowed_ports` | list of int | Ports that are expected and will not trigger alerts |
+| `alerts[].type` | string | Alert backend: `log` or `webhook` |
+| `alerts[].path` | string | File path for `log` alert type |
+| `alerts[].url` | string | Endpoint URL for `webhook` alert type |
+
 ## License
 
 MIT © 2024 [yourusername](https://github.com/yourusername)
