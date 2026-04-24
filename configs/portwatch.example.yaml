@@ -1,0 +1,39 @@
+# portwatch example configuration
+# Copy this file to portwatch.yaml and adjust to your environment.
+
+# How often to scan open ports (minimum: 1s)
+interval: 15s
+
+# Log verbosity: debug | info | warn | error
+log_level: info
+
+# Rules are evaluated in order. The first matching rule wins.
+# action: allow  — suppress alerts for this listener
+# action: deny   — immediately alert on this listener
+# Omitting port, proto, or address acts as a wildcard for that field.
+rules:
+  - name: allow-ssh
+    port: 22
+    proto: tcp
+    address: 0.0.0.0
+    action: allow
+
+  - name: allow-http
+    port: 80
+    proto: tcp
+    action: allow
+
+  - name: allow-https
+    port: 443
+    proto: tcp
+    action: allow
+
+  - name: deny-telnet
+    port: 23
+    proto: tcp
+    action: deny
+
+  - name: deny-high-risk-udp
+    port: 69
+    proto: udp
+    action: deny
