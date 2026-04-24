@@ -49,6 +49,14 @@ func TestLoad_MissingFile(t *testing.T) {
 	}
 }
 
+func TestLoad_InvalidYAML(t *testing.T) {
+	path := writeTempConfig(t, `interval: [not valid yaml`)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for invalid YAML")
+	}
+}
+
 func TestValidate_ShortInterval(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Interval = 500 * time.Millisecond
