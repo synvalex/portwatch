@@ -1,39 +1,50 @@
 # portwatch example configuration
 # Copy this file to portwatch.yaml and adjust to your environment.
 
-# How often to scan open ports (minimum: 1s)
-interval: 15s
+watch:
+  interval: 15s
+  debounce_seconds: 2
 
-# Log verbosity: debug | info | warn | error
-log_level: info
+pipeline:
+  sort:
+    field: port
+    descending: false
+  filter:
+    exclude_loopback: true
+    exclude_ports: []
 
-# Rules are evaluated in order. The first matching rule wins.
-# action: allow  — suppress alerts for this listener
-# action: deny   — immediately alert on this listener
-# Omitting port, proto, or address acts as a wildcard for that field.
+output:
+  format: text   # text | json
+
+alert:
+  enabled: true
+  # log_level controls the severity used when logging unexpected listeners.
+  # Valid values: info, warn, error
+  log_level: warn
+  # include_process attaches process name/PID to alert messages when available.
+  include_process: true
+  # dedup_window_seconds suppresses duplicate alerts for the same listener
+  # within this window. Set to 0 to disable deduplication.
+  dedup_window_seconds: 60
+
 rules:
+  # Allow SSH on all interfaces
   - name: allow-ssh
+    action: allow
+    protocol: tcp
     port: 22
-    proto: tcp
-    address: 0.0.0.0
-    action: allow
 
+  # Allow HTTP/HTTPS
   - name: allow-http
-    port: 80
-    proto: tcp
     action: allow
+    protocol: tcp
+    port: 80
 
   - name: allow-https
-    port: 443
-    proto: tcp
     action: allow
+    protocol: tcp
+    port: 443
 
-  - name: deny-telnet
-    port: 23
-    proto: tcp
-    action: deny
-
-  - name: deny-high-risk-udp
-    port: 69
-    proto: udp
+  # Deny everything else (implicit if no rule matches — this is explicit)
+  - name: deny-rest
     action: deny
