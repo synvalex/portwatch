@@ -82,3 +82,14 @@ func TestPipeline_Run_FilterApplied(t *testing.T) {
 		t.Errorf("expected only port 80, got %v", out)
 	}
 }
+
+func TestPipeline_Run_EmptyScanner(t *testing.T) {
+	p := ports.NewPipeline(&stubScanner{listeners: []ports.Listener{}}, nil, nil, ports.SortOptions{})
+	out, err := p.Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected empty result, got %d listeners", len(out))
+	}
+}
