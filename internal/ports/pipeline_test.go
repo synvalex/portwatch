@@ -93,3 +93,20 @@ func TestPipeline_Run_EmptyScanner(t *testing.T) {
 		t.Errorf("expected empty result, got %d listeners", len(out))
 	}
 }
+
+func TestPipeline_Run_SortDescending(t *testing.T) {
+	input := []ports.Listener{
+		makePipelineListener(443, "tcp"),
+		makePipelineListener(8080, "tcp"),
+		makePipelineListener(9090, "tcp"),
+	}
+	opts := ports.SortOptions{Field: ports.SortFieldPort, Ascending: false}
+	p := ports.NewPipeline(&stubScanner{listeners: input}, nil, nil, opts)
+	out, err := p.Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out[0].Port != 9090 || out[1].Port != 8080 || out[2].Port != 443 {
+		t.Errorf("unexpected sort order: %v %v %v", out[0].Port, out[1].Port, out[2].Port)
+	}
+}
