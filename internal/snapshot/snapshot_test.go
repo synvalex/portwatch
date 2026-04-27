@@ -83,3 +83,20 @@ func TestStore_Current_ReturnsCopy(t *testing.T) {
 		t.Errorf("expected 1 listener, got %d", len(current))
 	}
 }
+
+func TestStore_AllDisappeared_OnEmptyUpdate(t *testing.T) {
+	s := snapshot.NewStore()
+	s.Update([]ports.Listener{
+		listener("tcp", "0.0.0.0", 80),
+		listener("tcp", "0.0.0.0", 443),
+	})
+
+	diff := s.Update([]ports.Listener{})
+
+	if len(diff.Disappeared) != 2 {
+		t.Errorf("expected 2 disappeared, got %d", len(diff.Disappeared))
+	}
+	if len(diff.Appeared) != 0 {
+		t.Errorf("expected 0 appeared, got %d", len(diff.Appeared))
+	}
+}
