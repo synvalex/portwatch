@@ -46,6 +46,15 @@ func TestWebhookConfig_Validate_NegativeTimeout(t *testing.T) {
 	}
 }
 
+func TestWebhookConfig_Validate_ZeroTimeout(t *testing.T) {
+	// A zero timeout on an enabled webhook should be rejected, as it would
+	// cause all webhook requests to time out immediately.
+	cfg := WebhookConfig{Enabled: true, URL: "http://example.com", Timeout: 0}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error for zero timeout on enabled webhook")
+	}
+}
+
 func TestWebhookConfig_Merge_TimeoutFromDefault(t *testing.T) {
 	defaults := DefaultWebhookConfig()
 	cfg := WebhookConfig{Enabled: true, URL: "http://example.com"}
