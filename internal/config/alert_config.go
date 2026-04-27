@@ -1,56 +1,62 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
-// AlertConfig holds settings that control how alerts are emitted.
+// AlertConfig holds all alert-related configuration.
 type AlertConfig struct {
-	// Level is the minimum log level for alert messages (e.g. "info", "warn", "error").
-	Level string `yaml:"level"`
-
-	// DedupWindow is the duration during which identical alerts are suppressed.
+	Level       string        `yaml:"level"`
 	DedupWindow time.Duration `yaml:"dedup_window"`
-
-	// EvictInterval controls how often stale deduplication entries are purged.
-	EvictInterval time.Duration `yaml:"evict_interval"`
+	Webhook     WebhookConfig `yaml:"webhook"`
+	Slack       SlackConfig   `yaml:"slack"`
+	Email       EmailConfig   `yaml:"email"`
 }
 
-// DefaultAlertConfig returns an AlertConfig populated with sensible defaults.
+// DefaultAlertConfig returns sensible alert defaults.
 func DefaultAlertConfig() AlertConfig {
 	return AlertConfig{
-		Level:         "warn",
-		DedupWindow:   5 * time.Minute,
-		EvictInterval: 10 * time.Minute,
+		Level:       "info",
+		DedupWindow: 30 * time.Second,
+		Webhook:     DefaultWebhookConfig(),
+		Slack:       DefaultSlackConfig(),
+		Email:       DefaultEmailConfig(),
 	}
 }
 
-var validAlertLevels = map[string]bool{
-	"debug": true,
-	"info":  true,
-	"warn":  true,
-	"error": true,
+var validAlertLevels = map[string]struct{}{
+	"debug": {},
+	"info":  {},
+	"warn":  {},
+	"error": {},
 }
 
-// Validate returns an error if any AlertConfig field contains an invalid value.
+// Validate returns an error if AlertConfig contains invalid values.
 func (a AlertConfig) Validate() error {
-	if !validAlertLevels[a.Level] {
-		return fmt.Errorf("alert.level %q is not valid; choose one of debug, info, warn, error", a.Level)
+	if _, ok := validAlertLevels[a.Level]; !ok {
+		return fmt.Errorf("alert: unknown level %q", a.Level)
 	}
 	if a.DedupWindow < 0 {
-		return fmt.Errorf("alert.dedup_window must not be negative")
+		return errors.New("alert: dedup_window must not be negative")
 	}
 	if a.DedupWindow == 0 {
-		return fmt.Errorf("alert.dedup_window must be greater than zero")
+		return errors.New("alert: dedup_window must be greater than zero")
 	}
-	if a.EvictInterval <= 0 {
-		return fmt.Errorf("alert.evict_interval must be greater than zero")
+	if err := a.Webhook.Validate(); err != nil {
+		return fmt.Errorf("alert.webhook: %w", err)
+	}
+	if err := a.Slack.Validate(); err != nil {
+		return fmt.Errorf("alert.slack: %w", err)
+	}
+	if err := a.Email.Validate(); err != nil {
+		return fmt.Errorf("alert.email: %w", err)
 	}
 	return nil
 }
 
-// Merge returns a new AlertConfig where zero values are filled from defaults.
+// Merge fills zero-value fields in a from defaults.
 func (a AlertConfig) Merge(defaults AlertConfig) AlertConfig {
 	if a.Level == "" {
 		a.Level = defaults.Level
@@ -58,8 +64,8 @@ func (a AlertConfig) Merge(defaults AlertConfig) AlertConfig {
 	if a.DedupWindow == 0 {
 		a.DedupWindow = defaults.DedupWindow
 	}
-	if a.EvictInterval == 0 {
-		a.EvictInterval = defaults.EvictInterval
-	}
+	a.Webhook = a.Webhook.Merge(defaults.Webhook)
+	a.Slack = a.Slack.Merge(defaults.Slack)
+	a.Email = a.Email.Merge(defaults.Email)
 	return a
 }
