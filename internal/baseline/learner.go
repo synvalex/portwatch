@@ -1,73 +1,55 @@
 package baseline
 
 import (
-	"context"
-	"log/slog"
+	"sync"
 	"time"
 
-	"github.com/user/portwatch/internal/ports"
+	"github.com/example/portwatch/internal/ports"
 )
 
-// Learner observes listeners for a fixed duration and adds them all to a
-// baseline Store, optionally persisting the result to disk.
+// Learner observes listeners during a learning window and adds them to the
+// baseline store. Once the window expires, Observe becomes a no-op.
 type Learner struct {
+	mu       sync.Mutex
 	store    *Store
-	duration time.Duration
-	autoSave bool
-	logger   *slog.Logger
+	deadline time.Time
 }
 
-// NewLearner creates a Learner that populates store over duration.
-func NewLearner(store *Store, duration time.Duration, autoSave bool, logger *slog.Logger) *Learner {
-	if logger == nil {
-		logger = slog.Default()
-	}
+// NewLearner creates a Learner that records observations for the given duration.
+func NewLearner(store *Store, window time.Duration) *Learner {
 	return &Learner{
 		store:    store,
-		duration: duration,
-		autoSave: autoSave,
-		logger:   logger,
+		deadline: time.Now().Add(window),
 	}
 }
 
-// Learn runs until ctx is cancelled or the learn duration elapses, recording
-// every listener returned by scan into the store.
-func (l *Learner) Learn(ctx context.Context, scan func(context.Context) ([]ports.Listener, error)) error {
-	deadline := time.Now().Add(l.duration)
-	l.logger.Info("baseline learning started", "duration", l.duration)
+// Observe records the listener in the baseline if the learning window is still
+// open. It is safe to call concurrently.
+func (l *Learner) Observe(listener ports.Listener) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		listeners, err := scan(ctx)
-		if err != nil {
-			l.logger.Warn("baseline scan error", "err", err)
-		} else {
-			for _, li := range listeners {
-				l.store.Add(li)
-			}
-		}
-
-		if time.Now().After(deadline) {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			l.logger.Info("baseline learning cancelled")
-			return ctx.Err()
-		case <-ticker.C:
-		}
+	if time.Now().Before(l.deadline) {
+		l.store.Add(listener)
 	}
+}
 
-	l.logger.Info("baseline learning complete")
-	if l.autoSave && l.store.filePath != "" {
-		if err := l.store.Save(); err != nil {
-			l.logger.Warn("baseline save failed", "err", err)
-			return err
-		}
-		l.logger.Info("baseline saved", "file", l.store.filePath)
+// IsLearning reports whether the learning window is still active.
+func (l *Learner) IsLearning() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return time.Now().Before(l.deadline)
+}
+
+// Remaining returns how much time is left in the learning window.
+// Returns zero if the window has already closed.
+func (l *Learner) Remaining() time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	rem := time.Until(l.deadline)
+	if rem < 0 {
+		return 0
 	}
-	return nil
+	return rem
 }
