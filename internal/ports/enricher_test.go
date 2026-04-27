@@ -91,3 +91,20 @@ func TestEnricher_MultipleListeners(t *testing.T) {
 		t.Error("expected nil process for zero inode")
 	}
 }
+
+func TestEnricher_EmptyListeners(t *testing.T) {
+	called := false
+	e := newEnricherWithLookup(func(inode uint64) (*ProcessInfo, error) {
+		called = true
+		return nil, nil
+	})
+
+	out := e.Enrich([]Listener{})
+
+	if called {
+		t.Error("lookup should not be called for empty listener list")
+	}
+	if len(out) != 0 {
+		t.Errorf("expected empty output, got %d entries", len(out))
+	}
+}
