@@ -48,3 +48,15 @@ func (m *MultiNotifier) Add(n Notifier) {
 func (m *MultiNotifier) Len() int {
 	return len(m.notifiers)
 }
+
+// Remove removes the first notifier from the fan-out list that matches the
+// provided value by pointer equality. It reports whether a notifier was removed.
+func (m *MultiNotifier) Remove(n Notifier) bool {
+	for i, existing := range m.notifiers {
+		if existing == n {
+			m.notifiers = append(m.notifiers[:i], m.notifiers[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
