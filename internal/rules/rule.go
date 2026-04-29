@@ -75,8 +75,12 @@ func (r *Rule) Validate() error {
 			return fmt.Errorf("rule %q: protocol must be tcp, udp, or empty", r.Name)
 		}
 	}
-	if r.Address != "" && !strings.Contains(r.Address, "/") {
-		if net.ParseIP(r.Address) == nil {
+	if r.Address != "" {
+		if strings.Contains(r.Address, "/") {
+			if _, _, err := net.ParseCIDR(r.Address); err != nil {
+				return fmt.Errorf("rule %q: invalid CIDR address %q: %w", r.Name, r.Address, err)
+			}
+		} else if net.ParseIP(r.Address) == nil {
 			return fmt.Errorf("rule %q: invalid address %q", r.Name, r.Address)
 		}
 	}
