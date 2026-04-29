@@ -3,49 +3,68 @@ package history
 import (
 	"time"
 
-	"github.com/user/portwatch/internal/alert"
+	"github.com/yourorg/portwatch/internal/ports"
 )
 
-// Query holds filter parameters for searching history events.
-type Query struct {
-	// Since filters events to those recorded at or after this time.
-	// Zero value means no lower bound.
-	Since time.Time
+// EventType represents the kind of change observed for a listener.
+type EventType string
 
-	// EventType filters by event type. Empty string means all types.
-	EventType alert.EventType
+const (
+	EventAppeared    EventType = "appeared"
+	EventDisappeared EventType = "disappeared"
+)
 
-	// Port filters by listener port. 0 means all ports.
-	Port uint16
-
-	// Limit caps the number of results. 0 means use store default.
-	Limit int
+// Event records a single port change observed by the monitor.
+type Event struct {
+	Listener  ports.Listener
+	EventType EventType
+	OccurredAt time.Time
 }
 
-// Search returns events from the store that match the given query.
-func (s *Store) Search(q Query) []alert.Event {
-	limit := q.Limit
-	if limit <= 0 {
-		limit = 100
-	}
+// Query provides read access to historical port events.
+type Query struct {
+	store *Store
+}
 
-	all := s.Recent(limit * 10) // fetch extra to allow filtering
+// NewQuery creates a Query backed by the given Store.
+func NewQuery(s *Store) *Query {
+	return &Query{store: s}
+}
 
-	var results []alert.Event
-	for _, ev := range all {
-		if !q.Since.IsZero() && ev.Time.Before(q.Since) {
-			continue
-		}
-		if q.EventType != "" && ev.Type != q.EventType {
-			continue
-		}
-		if q.Port != 0 && ev.Listener.Address.Port != q.Port {
-			continue
-		}
-		results = append(results, ev)
-		if len(results) >= limit {
-			break
+// Recent returns all events that occurred within the given duration.
+func (q *Query) Recent(window time.Duration) []Event {
+	return q.store.Recent(window)
+}
+
+// Since returns all events that occurred after the given time.
+func (q *Query) Since(t time.Time) []Event {
+	window := time.Since(t)
+	if window <= 0 {
+		return nil
+	}
+	return q.store.Recent(window)
+}
+
+// ByPort filters events to those matching the given port number.
+func (q *Query) ByPort(port uint16) []Event {
+	all := q.store.Recent(q.store.retention)
+	var out []Event
+	for _, e := range all {
+		if e.Listener.Port == port {
+			out = append(out, e)
 		}
 	}
-	return results
+	return out
+}
+
+// ByEventType filters events to those matching the given EventType.
+func (q *Query) ByEventType(et EventType) []Event {
+	all := q.store.Recent(q.store.retention)
+	var out []Event
+	for _, e := range all {
+		if e.EventType == et {
+			out = append(out, e)
+		}
+	}
+	return out
 }
